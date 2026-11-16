@@ -1,0 +1,21 @@
+# Python 3.9 or newer.
+#
+# Only the example exporters need third-party packages. `pack.py` and
+# `third_party/onnxruntime/fetch.py` use the standard library only.
+#
+# torch is used for `torch.onnx.export(..., dynamo=False)`, so a CPU-only build
+# is enough. On a machine without a GPU install it first with:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+# Lower bounds:
+#   torch 2.5 - `dynamo` was added to torch.onnx.export in 2.5, and the scripts
+#               depend on it being disabled.
+#   onnx 1.15 - the TorchScript exporter builds and writes the proto with it.
+#   numpy 1.24 - covers every array helper the scripts use.
+#
+# `onnxscript` is deliberately absent: it is only imported by the dynamo
+# exporter, which these scripts disable. Verified by blocking the import and
+# exporting successfully with `dynamo=False`.
+numpy>=1.24,<3
+onnx>=1.15,<2
+torch>=2.5,<3

@@ -1,0 +1,2 @@
+add_subdirectory(vector_scaler_onnx)
+add_subdirectory(window_pure_onnx)

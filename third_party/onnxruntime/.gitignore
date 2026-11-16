@@ -1,0 +1,6 @@
+# Fetched by fetch.py; too large to track and reproducible from the pinned
+# version in that script.
+.cache/
+include/
+lib/
+VERSION.txt

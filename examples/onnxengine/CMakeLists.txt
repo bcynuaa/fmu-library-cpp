@@ -1,0 +1,2 @@
+add_subdirectory(vector_predictor)
+add_subdirectory(window_predictor)
