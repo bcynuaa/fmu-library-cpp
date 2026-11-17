@@ -102,8 +102,8 @@ void runExample(const std::array<fmi2Real, 3>& input_values) {
     };
     const std::string resource_uri = fileUri(resource_directory);
     ComponentGuard component(
-        fmi2Instantiate("fmi2_cs_vector_scaler_onnx_example", fmi2CoSimulation,
-            "{fmi2_cs_vector_scaler_onnx-example}", resource_uri.c_str(),
+        fmi2Instantiate("fmi2_cs_vector_coder_onnx_example", fmi2CoSimulation,
+            "{fmi2_cs_vector_coder_onnx-example}", resource_uri.c_str(),
             &callbacks, fmi2False, fmi2False));
     if (!component.get()) {
         throw std::runtime_error("fmi2Instantiate failed.");

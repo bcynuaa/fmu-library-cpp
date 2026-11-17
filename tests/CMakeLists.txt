@@ -1,6 +1,6 @@
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-foreach(model_name IN ITEMS vector_scaler_onnx window_pure_onnx)
+foreach(model_name IN ITEMS vector_coder_onnx window_pure_onnx)
     set(test_target test_cs_${model_name})
     set(resource_directory
         "${FMI_RESOURCE_OUTPUT_DIR}/model/${model_name}/${FMI_PLATFORM_TAG}")

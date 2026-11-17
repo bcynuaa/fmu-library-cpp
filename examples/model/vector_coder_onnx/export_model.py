@@ -1,4 +1,4 @@
-"""Export shared resources for the FMI 2 and FMI 3 vector scaler examples."""
+"""Export shared resources for the FMI 2 and FMI 3 vector coder examples."""
 
 from __future__ import annotations
 
@@ -101,7 +101,7 @@ class OnnxModel(torch.nn.Module):
     pass
 
 
-def export_scaler(
+def export_coder(
     input_shift: NDArray[np.float64],
     input_scale: NDArray[np.float64],
     output_shift: NDArray[np.float64],
@@ -146,12 +146,12 @@ def export_model(output_directory: Path, platform_tag: str, runtime_directory: P
     input_scale = np.array([1.0, 2.0, 3.0], dtype=np.float64)
     output_shift = np.array([0.4, 0.5], dtype=np.float64)
     output_scale = np.array([4.0, 5.0], dtype=np.float64)
-    export_scaler(
+    export_coder(
         input_shift,
         input_scale,
         output_shift,
         output_scale,
-        output_directory / "scaler.bin",
+        output_directory / "coder.bin",
     )
 
     for library in runtime_libraries(runtime_directory, platform_tag):
@@ -173,12 +173,12 @@ def export_model(output_directory: Path, platform_tag: str, runtime_directory: P
 
 def parse_arguments() -> argparse.Namespace:
     default_platform_tag = host_platform_tag()
-    parser = argparse.ArgumentParser(description="Export the vector_scaler_onnx example.")
+    parser = argparse.ArgumentParser(description="Export the vector_coder_onnx example.")
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory for the model, scaler data, and runtime libraries.",
+        help="Directory for the model, coder data, and runtime libraries.",
     )
     parser.add_argument(
         "--platform-tag",
@@ -199,7 +199,7 @@ def parse_arguments() -> argparse.Namespace:
             / "bin"
             / "resources"
             / "model"
-            / "vector_scaler_onnx"
+            / "vector_coder_onnx"
             / arguments.platform_tag
         )
         pass

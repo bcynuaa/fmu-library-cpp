@@ -1,5 +1,5 @@
-#ifndef FMI_MODEL_VECTOR_SCALER_ONNX_MODEL_HPP_
-#define FMI_MODEL_VECTOR_SCALER_ONNX_MODEL_HPP_
+#ifndef FMI_MODEL_VECTOR_CODER_ONNX_MODEL_HPP_
+#define FMI_MODEL_VECTOR_CODER_ONNX_MODEL_HPP_
 
 #include <algorithm>
 #include <cmath>
@@ -13,7 +13,7 @@
 #include "onnxengine/onnxengine.hpp"
 #include "utils/fmu_io.hpp"
 
-namespace vector_scaler_onnx {
+namespace vector_coder_onnx {
 
 class Model {
     public:
@@ -40,7 +40,7 @@ class Model {
                 this->predictor_.lastError());
         this->input_size_ = this->predictor_.inputSize();
         this->output_size_ = this->predictor_.outputSize();
-        if (!this->loadScaler(resources)) return false;
+        if (!this->loadCoder(resources)) return false;
         this->values_.assign(this->input_size_ + this->output_size_, 0.0);
         this->scaled_input_.assign(this->input_size_, 0.0);
         this->scaled_output_.assign(this->output_size_, 0.0);
@@ -118,33 +118,56 @@ class Model {
         return false;
     }
 
-    bool loadScaler(const std::filesystem::path& resources) {
-        auto path = resources / "scaler.bin";
-        // A present but invalid scaler must not silently select the legacy
-        // file.
-        if (!std::filesystem::exists(path))
-            path = resources / "pptransform.bin";
+    bool loadCoder(const std::filesystem::path& resources) {
+        // A present preferred file must be valid. Other .bin files are tried
+        // in name order until one matches the model.
+        constexpr const char* kPreferredNames[] = {
+            "coder.bin", "scaler.bin", "pptransform.bin"};
+        for (const char* name : kPreferredNames) {
+            const auto candidate = resources / name;
+            if (std::filesystem::exists(candidate))
+                return this->readCoder(candidate);
+        }
+        std::vector<std::filesystem::path> fallback_paths;
+        for (const auto& entry :
+            std::filesystem::directory_iterator(resources)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".bin")
+                fallback_paths.push_back(entry.path());
+        }
+        std::sort(fallback_paths.begin(), fallback_paths.end());
+        if (fallback_paths.empty())
+            return this->readCoder(resources / "coder.bin");
+        for (const auto& path : fallback_paths) {
+            if (this->readCoder(path)) {
+                this->error_.clear();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool readCoder(const std::filesystem::path& path) {
         std::ifstream file(path, std::ios::binary);
-        if (!file) return this->fail("Cannot open scaler: " + path.u8string());
+        if (!file) return this->fail("Cannot open coder: " + path.u8string());
         std::int32_t inputs = 0, outputs = 0;
         if (!fmuio::readOne(file, inputs) || !fmuio::readOne(file, outputs) ||
             inputs <= 0 || outputs <= 0 ||
             static_cast<std::size_t>(inputs) != this->input_size_ ||
             static_cast<std::size_t>(outputs) != this->output_size_)
             return this->fail(
-                "Scaler dimensions do not match model: " + path.u8string());
+                "Coder dimensions do not match model: " + path.u8string());
         if (!fmuio::readDoubles(file, this->input_shift_, this->input_size_) ||
             !fmuio::readDoubles(file, this->input_scale_, this->input_size_) ||
             !fmuio::readDoubles(
                 file, this->output_shift_, this->output_size_) ||
             !fmuio::readDoubles(file, this->output_scale_, this->output_size_))
-            return this->fail("Truncated scaler: " + path.u8string());
+            return this->fail("Truncated coder: " + path.u8string());
         for (const auto* values : {&this->input_shift_, &this->input_scale_,
                  &this->output_shift_, &this->output_scale_}) {
             if (!std::all_of(values->begin(), values->end(),
                     [](double value) { return std::isfinite(value); }))
                 return this->fail(
-                    "Nonfinite scaler coefficient: " + path.u8string());
+                    "Nonfinite coder coefficient: " + path.u8string());
         }
         if (std::any_of(this->input_scale_.begin(), this->input_scale_.end(),
                 [](double value) { return value == 0.0; }))
@@ -166,6 +189,6 @@ class Model {
     std::vector<double> output_scale_;
 };
 
-}  // namespace vector_scaler_onnx
+}  // namespace vector_coder_onnx
 
-#endif  // FMI_MODEL_VECTOR_SCALER_ONNX_MODEL_HPP_
+#endif  // FMI_MODEL_VECTOR_CODER_ONNX_MODEL_HPP_

@@ -519,7 +519,7 @@ def main() -> int:
         )
         pass
 
-    print("\nDone. Configure with -DFMI_BUILD_VECTOR_SCALER_ONNX=ON.")
+    print("\nDone. Configure with: cmake -S . -B build")
     return 0
     pass
 

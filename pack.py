@@ -7,10 +7,10 @@ Layout produced:
     ├── SOURCE.txt                     commit, timestamp, platforms, file count
     ├── binary/                        shared libraries built from src/
     │   ├── win64-x64/
-    │   │   ├── fmi2_cs_vector_scaler_onnx.dll
+    │   │   ├── fmi2_cs_vector_coder_onnx.dll
     │   │   └── fmi2_cs_window_pure_onnx.dll
     │   └── linux64-x64/
-    │       ├── fmi2_cs_vector_scaler_onnx.so
+    │       ├── fmi2_cs_vector_coder_onnx.so
     │       └── fmi2_cs_window_pure_onnx.so
     └── runtime/
         └── onnxruntime/               everything under ONNX Runtime's lib/
@@ -29,7 +29,8 @@ Collecting merges into whatever is already there, so a Windows build and a
 Linux build gathered on different machines end up in the same tree. Only files
 with the same platform and name are replaced; everything else is left alone.
 Legacy `lib`-prefixed model copies are removed when their replacements are
-collected. Rebuild older model libraries before packing; ONNX Runtime libraries
+collected. Old `vector_scaler_onnx` libraries are skipped and removed when the
+renamed `vector_coder_onnx` libraries are collected. ONNX Runtime libraries
 keep their upstream names.
 Pass `--clean` to start from an empty tree.
 
@@ -77,6 +78,7 @@ def is_model_library(path: Path) -> bool:
         path.is_file()
         and is_shared_library(path)
         and not path.name.startswith("lib")
+        and "vector_scaler_onnx" not in path.stem
     )
     pass
 
@@ -152,6 +154,13 @@ def collect_binaries(
         legacy_target = target.with_name(f"lib{target.name}")
         if legacy_target.is_file():
             legacy_target.unlink()
+            pass
+        if "vector_coder_onnx" in target.stem:
+            old_name = target.name.replace("vector_coder_onnx", "vector_scaler_onnx")
+            old_target = target.with_name(old_name)
+            if old_target.is_file():
+                old_target.unlink()
+                pass
             pass
         pass
     return collected

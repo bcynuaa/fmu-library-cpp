@@ -1,5 +1,7 @@
 [toc]
 
+> 这份备忘写于第一版 FMU 迭代（`fmi2-regressor-cpp`）。代码路径和程序结构已按当前仓库更新，结论未改。
+
 # 关于制作`FMU`的思考
 
 第一次接触`FMU`这个东西是26年7月底, 在此之前对于`FMU`的理解大概就是一个计算模块, 类似`Simulink`中的一个block。但实际开始制作之后, 发现比想象的要复杂一些。一个基本的`FMU`会有如下文件夹(以`FMI2.0`为例):
@@ -63,7 +65,7 @@ fmi2Status fmi2DoStep(
 1. 先读`src/core/fmi2/fmi2_wrapper.cpp`, 这是对外暴露的`FMI2.0`必须的接口;
 2. 再读`include/fmi2/fmi2_base.hpp`和`include/fmi2/cs_base.hpp`, 这里是所有接口的基本实现, 也就是说具体模型里不实现的话就默认走这里的实现;
 3. 再读`src/model/detail/fmi2_cs_model.hpp`, 它把算法接进 FMI 2 的生命周期和 C API 数据转换;
-4. 再读任意一个具体的模型实现, 比如`src/model/vector_scaler_onnx/model.hpp`, 展示了从读取资源、入参、求值、出参、重置等一系列流程; `window_pure_onnx` 那个则是带滚动窗口的变体;
+4. 再读任意一个具体的模型实现, 比如`src/model/vector_coder_onnx/model.hpp`, 展示了从读取资源、入参、求值、出参、重置等一系列流程; `window_pure_onnx` 那个则是带滚动窗口的变体;
 5. 如果模型需要用到`onnx`, 则需要额外看一下`include/onnxengine/`, 这里展示了如何调取对应`onnx`运行时动态链接库来催动`onnx`格式运作的。
 
 整个代码仓库的产物是编译平台对应的动态链接库, 可以用根目录下`pack.py`脚本抓取产物至`artifacts/`目录。再把动态链接库交给打包`FMU`的`python`程序消费即可。

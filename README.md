@@ -1,7 +1,5 @@
 # fmu-library-cpp
 
-A cpp package for generating FMU binaries.
-
 C++ model libraries for FMI 2.0 and FMI 3.0 Co-Simulation that wrap ONNX models
 and handwritten predictors.
 
@@ -21,22 +19,14 @@ model contract plus the steps to add one.
 
 ## Contents
 
-- [fmu-library-cpp](#fmu-library-cpp)
-  - [Contents](#contents)
-  - [Requirements](#requirements)
-  - [Quick start](#quick-start)
-  - [Models](#models)
-  - [Output layout](#output-layout)
-  - [Packaging](#packaging)
-  - [Verification](#verification)
-  - [Behavior notes](#behavior-notes)
-  - [Adding an algorithm for FMI 2 and FMI 3](#adding-an-algorithm-for-fmi-2-and-fmi-3)
-    - [1. Add the model files](#1-add-the-model-files)
-    - [2. Implement the algorithm's model](#2-implement-the-algorithms-model)
-    - [3. Add one factory per FMI version](#3-add-one-factory-per-fmi-version)
-    - [4. Register both libraries in CMake](#4-register-both-libraries-in-cmake)
-    - [5. Add resources and examples](#5-add-resources-and-examples)
-    - [6. Add verification for the new algorithm](#6-add-verification-for-the-new-algorithm)
+- [Requirements](#requirements)
+- [Quick start](#quick-start)
+- [Models](#models)
+- [Output layout](#output-layout)
+- [Packaging](#packaging)
+- [Verification](#verification)
+- [Behavior notes](#behavior-notes)
+- [Adding an algorithm for FMI 2 and FMI 3](#adding-an-algorithm-for-fmi-2-and-fmi-3)
 
 ## Requirements
 
@@ -69,13 +59,13 @@ Model resources and the console examples need the Python packages:
 
 ```sh
 python -m pip install -r requirements.txt
-python examples/model/vector_scaler_onnx/export_model.py
+python examples/model/vector_coder_onnx/export_model.py
 python examples/model/window_pure_onnx/export_model.py
 ```
 
 Each model has one shared exporter at
 `examples/model/<model>/export_model.py`, used by both FMI versions. It writes
-`model.onnx` and any scaler file to
+`model.onnx` and any coder file to
 `build/bin/resources/model/<model>/<platform-tag>` by default.
 
 Run every Python example script recursively with:
@@ -91,11 +81,11 @@ a nonzero exit code if any script fails.
 
 ## Models
 
-The vector scaler and window models support FMI 2 and FMI 3 Co-Simulation.
+The vector coder and window models support FMI 2 and FMI 3 Co-Simulation.
 
 | Model | Mapping | Resources |
 | --- | --- | --- |
-| `vector_scaler_onnx` | `[1, Nx]` -> `[1, Ny]` with a per-port scaler | `model.onnx`, `scaler.bin` |
+| `vector_coder_onnx` | `[1, Nx]` -> `[1, Ny]` with a per-port coder | `model.onnx`, `coder.bin` |
 | `window_pure_onnx` | `[1, W, Nx + Ny]` -> `[1, Ny]` rolling window | `model.onnx` |
 
 Each algorithm owns its implementation in `src/model/<model>/model.hpp`,
@@ -109,7 +99,7 @@ protocol's lifecycle and C API data conversion.
 FMI 3 models expose scalar Float64 ports. Model Exchange and Scheduled
 Execution entry points return unsupported; their interfaces are not
 implemented. See the FMI 3 examples for details:
-[vector scaler](examples/model/vector_scaler_onnx/fmi3_cs/README.md) and
+[vector coder](examples/model/vector_coder_onnx/fmi3_cs/README.md) and
 [window model](examples/model/window_pure_onnx/fmi3_cs/README.md). These
 targets build shared libraries and console examples only.
 
@@ -124,8 +114,8 @@ prefix:
 | Linux | `<modelIdentifier>.so` |
 | macOS | `<modelIdentifier>.dylib` |
 
-For example, the Linux vector scaler library is
-`build/bin/lib/linux64-x64/fmi2_cs_vector_scaler_onnx.so`.
+For example, the Linux vector coder library is
+`build/bin/lib/linux64-x64/fmi2_cs_vector_coder_onnx.so`.
 CMake also links examples using these names. ONNX Runtime keeps its upstream
 filenames, including `libonnxruntime.so` on Linux.
 
@@ -147,7 +137,10 @@ is staging only: it writes no `modelDescription.xml` and no `.fmu` archive.
 
 Rebuild existing build directories with `cmake --build build` before running
 `python pack.py`. Packing skips old `lib`-prefixed model libraries and removes
-the old copy when collecting its replacement in `artifacts/binary/`.
+the old copy when collecting its replacement in `artifacts/binary/`. It also
+skips stale `vector_scaler_onnx` libraries left in an existing build tree and
+removes their artifact copies when the renamed `vector_coder_onnx` libraries
+are collected.
 
 ## Verification
 
@@ -172,7 +165,7 @@ for each model, FMI 2 contracts, FMI 3 contracts, numerical parity, and resource
 checks. They exercise lifecycle order, port permissions, atomic batch access,
 time validation, reset, FMI 3 result pointers, and unsupported capabilities.
 They compare predictions with expected values before and after reset, then
-check Chinese paths, missing/corrupt resources, scaler validation, and logging
+check Chinese paths, missing/corrupt resources, coder validation, and logging
 callbacks. Test executables stay under the build directory's `tests/` folder.
 
 ## Behavior notes
@@ -186,9 +179,12 @@ C API.
 
 Resource directories support UTF-8 paths, including Chinese characters. FMI 2
 also accepts percent-escaped `file://` URIs; plain paths keep literal percent
-sequences. Scaler loading validates dimensions, complete coefficient arrays,
-finite coefficients, and nonzero input scales. `pptransform.bin` is accepted
-only when `scaler.bin` is absent; a corrupt primary file causes failure.
+sequences. Coder loading validates dimensions, complete coefficient arrays,
+finite coefficients, and nonzero input scales. The resource filename priority is
+`coder.bin`, `scaler.bin`, then `pptransform.bin`. If none exists, the model
+tries every other `*.bin` file in the resource directory in filename order
+until it finds valid coefficients. A present but invalid preferred file causes
+failure instead of silently selecting another file.
 
 A missing resource location is legal in both FMI versions. Models that need
 resources reject it from `load()`, and the C API reports that reason through
@@ -225,7 +221,7 @@ examples/model/linear_gain/
 ```
 
 Use the existing
-[vector scaler](src/model/vector_scaler_onnx/model.hpp) and
+[vector coder](src/model/vector_coder_onnx/model.hpp) and
 [window model](src/model/window_pure_onnx/model.hpp) as resource-based examples.
 Keep the computation independent of FMI types and callbacks. Follow
 [AGENTS.md](AGENTS.md), including four-space indentation and

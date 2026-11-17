@@ -82,10 +82,10 @@ void runExample(const std::array<fmi3Float64, 3>& input_values) {
 
     const std::string resource_path =
         std::filesystem::absolute(resource_directory).u8string();
-    InstanceGuard component(fmi3InstantiateCoSimulation(
-        "fmi3_cs_vector_scaler_onnx_example", kExampleToken,
-        resource_path.c_str(), fmi3False, fmi3False, fmi3False, fmi3False,
-        nullptr, 0, nullptr, logMessage, nullptr));
+    InstanceGuard component(
+        fmi3InstantiateCoSimulation("fmi3_cs_vector_coder_onnx_example",
+            kExampleToken, resource_path.c_str(), fmi3False, fmi3False,
+            fmi3False, fmi3False, nullptr, 0, nullptr, logMessage, nullptr));
     if (!component.get()) {
         throw std::runtime_error("fmi3InstantiateCoSimulation failed.");
     }

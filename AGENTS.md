@@ -78,11 +78,11 @@ and:
   - `fmi3`
     - `fmi3_wrapper.cpp`: common/CS C API exports and exception handling; ME/SE entry points return unsupported
 - `model`: the implement of different model
-  - `vector_scaler_onnx`: the model relies on onnx with input/output scaler of `[1, Nx]` -> `[1, Ny]` relies on scaler
+  - `vector_coder_onnx`: the model uses input/output affine coding around an ONNX predictor of `[1, Nx]` -> `[1, Ny]`; its resources contain `coder.bin` and accept legacy or other `*.bin` filenames when that file is absent
     - `fmi2_cs`: co-simulation mode
-      - `fmi2_cs_vector_scaler_onnx.cpp`: implement of fmi2, cs's `vector_scaler_onnx`
+      - `fmi2_cs_vector_coder_onnx.cpp`: implement of fmi2, cs's `vector_coder_onnx`
     - `fmi3_cs`: FMI 3 CS implementation with scalar Float64 ports; shares resources with `fmi2_cs`
-  - `vector_pure_onnx`: the model relies on onnx with input/output scaler of `[1, Nx]` -> `[1, Ny]`, no extra scaler for input and output
+  - `vector_pure_onnx`: the model relies on onnx with input/output coder of `[1, Nx]` -> `[1, Ny]`, no extra coder for input and output
     - `fmi2_cs`: co-simulation mode
       - `fmi2_cs_vector_pure_onnx.cpp`: implement of fmi2, cs's `vector_pure_onnx`
     - `fmi3_cs`: TODO, similar to `fmi2_cs`
@@ -90,11 +90,11 @@ and:
     - `fmi2_cs`: co-simulation mode
       - `fmi2_cs_rbf.cpp`: implement of fmi2, cs's `rbf`
     - `fmi3_cs`: TODO, similar to `fmi3_cs`
-  - `window_pure_onnx`: the model relies on onnx with a rolling window of `[1, W, Nx + Ny]` -> `[1, Ny]`, no extra scaler; the C++ side keeps the window and exposes `Nx` inputs plus `Ny` initial outputs
+  - `window_pure_onnx`: the model relies on onnx with a rolling window of `[1, W, Nx + Ny]` -> `[1, Ny]`, no extra coder; the C++ side keeps the window and exposes `Nx` inputs plus `Ny` initial outputs
     - `fmi2_cs`: co-simulation mode
       - `fmi2_cs_window_pure_onnx.cpp`: implement of fmi2, cs's `window_pure_onnx`
     - `fmi3_cs`: FMI 3 CS implementation with scalar Float64 ports; shares resources with `fmi2_cs`
-  - TODO: `neuralode`, `window_scaler_onnx`...
+  - TODO: `neuralode`, `window_coder_onnx`...
 
 ## Examples Folder
 

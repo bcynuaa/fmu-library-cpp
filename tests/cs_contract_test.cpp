@@ -23,6 +23,10 @@
 #include "onnxengine/onnxengine.hpp"
 #include "utils/fmu_io.hpp"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace {
 
 using Reference = fmi2ValueReference;
@@ -780,32 +784,67 @@ void checkResources(
         std::filesystem::remove(runtime);
         std::filesystem::rename(saved_runtime, runtime);
 
-        if (model != "vector_scaler_onnx") continue;
-        const auto scaler = directory / "scaler.bin";
-        const auto contents = readBytes(scaler);
+        if (model != "vector_coder_onnx") continue;
+        const auto coder = directory / "coder.bin";
+        const auto contents = readBytes(coder);
+        const auto previous_coder = directory / "scaler.bin";
         const auto legacy = directory / "pptransform.bin";
-        std::filesystem::rename(scaler, legacy);
+        const auto arbitrary = directory / "other_coefficients.bin";
+        const auto earlier_arbitrary = directory / "a_invalid.bin";
+        for (const auto& entry :
+            std::filesystem::directory_iterator(directory)) {
+            if (entry.path() != coder && entry.path().extension() == ".bin")
+                std::filesystem::remove(entry.path());
+        }
+
+        writeBytes(previous_coder, contents);
+        writeBytes(coder, {'b', 'a', 'd'});
+        expectLoadError(version, model, directory, "Coder dimensions");
+        writeBytes(coder, contents);
+        std::filesystem::remove(previous_coder);
+
+        std::filesystem::rename(coder, previous_coder);
         {
             Client client(version, model, directory);
             runSeries(client, 1.25);
         }
-        writeBytes(scaler, {'b', 'a', 'd'});
-        expectLoadError(version, model, directory, "dimensions");
-        std::filesystem::remove(scaler);
-        std::filesystem::rename(legacy, scaler);
-        std::filesystem::remove(scaler);
-        expectLoadError(version, model, directory, "Cannot open scaler");
+        writeBytes(legacy, contents);
+        writeBytes(previous_coder, {'b', 'a', 'd'});
+        expectLoadError(version, model, directory, "Coder dimensions");
+        std::filesystem::remove(previous_coder);
+        {
+            Client client(version, model, directory);
+            runSeries(client, 1.25);
+        }
+
+        writeBytes(arbitrary, contents);
+        writeBytes(legacy, {'b', 'a', 'd'});
+        expectLoadError(version, model, directory, "Coder dimensions");
+        std::filesystem::remove(legacy);
+        {
+            Client client(version, model, directory);
+            runSeries(client, 1.25);
+        }
+        writeBytes(earlier_arbitrary, {'b', 'a', 'd'});
+        {
+            Client client(version, model, directory);
+            runSeries(client, 1.25);
+        }
+        std::filesystem::remove(arbitrary);
+        expectLoadError(version, model, directory, "Coder dimensions");
+        std::filesystem::remove(earlier_arbitrary);
+        expectLoadError(version, model, directory, "Cannot open coder");
         writeBytes(
-            scaler, std::vector<char>(contents.begin(), contents.begin() + 4));
+            coder, std::vector<char>(contents.begin(), contents.begin() + 4));
         expectLoadError(version, model, directory, "dimensions");
         writeBytes(
-            scaler, std::vector<char>(contents.begin(), contents.end() - 1));
-        expectLoadError(version, model, directory, "Truncated scaler");
+            coder, std::vector<char>(contents.begin(), contents.end() - 1));
+        expectLoadError(version, model, directory, "Truncated coder");
         auto invalid_dimensions = contents;
         const std::int32_t invalid_count = 99;
         std::memcpy(
             invalid_dimensions.data(), &invalid_count, sizeof(invalid_count));
-        writeBytes(scaler, invalid_dimensions);
+        writeBytes(coder, invalid_dimensions);
         expectLoadError(version, model, directory, "dimensions");
         // 3 inputs, 2 outputs; each coefficient group must be finite.
         for (const std::size_t coefficient : {0u, 3u, 6u, 8u}) {
@@ -816,8 +855,8 @@ void checkResources(
                 std::memcpy(invalid.data() + 2 * sizeof(std::int32_t) +
                         coefficient * sizeof(double),
                     &value, sizeof(value));
-                writeBytes(scaler, invalid);
-                expectLoadError(version, model, directory, "Nonfinite scaler");
+                writeBytes(coder, invalid);
+                expectLoadError(version, model, directory, "Nonfinite coder");
             }
         }
         auto zero_scale = contents;
@@ -825,9 +864,9 @@ void checkResources(
         std::memcpy(
             zero_scale.data() + 2 * sizeof(std::int32_t) + 3 * sizeof(double),
             &zero, sizeof(zero));
-        writeBytes(scaler, zero_scale);
+        writeBytes(coder, zero_scale);
         expectLoadError(version, model, directory, "Zero input scale");
-        writeBytes(scaler, contents);
+        writeBytes(coder, contents);
     }
 }
 
@@ -889,6 +928,9 @@ void checkLoggingCallbacks(
 }  // namespace
 
 int main(int argc, char* argv[]) {
+#ifdef _WIN32
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
+#endif
     try {
         require(argc == 4,
             "usage: test_cs <model> <resources> "
