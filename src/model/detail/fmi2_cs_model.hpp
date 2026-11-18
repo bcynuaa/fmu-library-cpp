@@ -53,7 +53,9 @@ class FMI2CSModel final : public fmi2::CsBase {
     }
     fmi2Status doStep(
         fmi2Real point, fmi2Real step_size, fmi2Boolean) override {
-        if (!this->lifecycle_.canStep(point, step_size)) return fmi2Error;
+        if (!this->lifecycle_.canStep(point, step_size,
+                this->computation_.supportsVariableCommunicationStepSize()))
+            return fmi2Error;
         if (!this->computation_.step()) return fmi2Error;
         this->lifecycle_.completeStep(point, step_size);
         return fmi2OK;

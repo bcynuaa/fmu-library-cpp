@@ -53,6 +53,8 @@ class CSLifecycle {
         this->time_ = 0.0;
         this->stop_time_ = 0.0;
         this->stop_time_defined_ = false;
+        this->fixed_step_size_ = 0.0;
+        this->fixed_step_size_defined_ = false;
         this->state_ = State::kInstantiated;
     }
 
@@ -65,7 +67,8 @@ class CSLifecycle {
     }
 
     bool canStep(fmi2Real current_communication_point,
-        fmi2Real communication_step_size) const noexcept {
+        fmi2Real communication_step_size,
+        bool supports_variable_step_size) const noexcept {
         const double next_time =
             current_communication_point + communication_step_size;
         const double time_tolerance = 8.0 *
@@ -79,6 +82,10 @@ class CSLifecycle {
             next_time > this->time_ &&
             std::abs(current_communication_point - this->time_) <=
             time_tolerance &&
+            (supports_variable_step_size || !this->fixed_step_size_defined_ ||
+                std::abs(communication_step_size - this->fixed_step_size_) <=
+                    8.0 * std::numeric_limits<double>::epsilon() *
+                        (std::max)(1.0, std::abs(this->fixed_step_size_))) &&
             (!this->stop_time_defined_ ||
                 next_time - this->stop_time_ <= time_tolerance);
     }
@@ -86,6 +93,10 @@ class CSLifecycle {
     void completeStep(fmi2Real current_communication_point,
         fmi2Real communication_step_size) noexcept {
         this->time_ = current_communication_point + communication_step_size;
+        if (!this->fixed_step_size_defined_) {
+            this->fixed_step_size_ = communication_step_size;
+            this->fixed_step_size_defined_ = true;
+        }
     }
 
     private:
@@ -95,6 +106,8 @@ class CSLifecycle {
     double time_ = 0.0;
     double stop_time_ = 0.0;
     bool stop_time_defined_ = false;
+    double fixed_step_size_ = 0.0;
+    bool fixed_step_size_defined_ = false;
 };
 
 }  // namespace detail

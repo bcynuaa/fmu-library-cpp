@@ -361,6 +361,13 @@ void checkContracts(Client& client) {
         // The host may calculate time differently from the model's additions.
         expectStatus(client.step(1.25 + 0.1 * index, 0.1), 0,
             "valid step after rejected requests");
+        if (client.windowModel() && index == 0) {
+            const auto after_first_step = client.values();
+            expectStatus(client.step(1.35, 0.05), 3,
+                "variable step rejected by fixed-step model");
+            require(client.values() == after_first_step,
+                "rejected variable step changed model values");
+        }
     }
     const double time = 1.55;
     const auto at_stop = client.values();
@@ -394,6 +401,10 @@ void checkContracts(Client& client) {
     expectStatus(client.exitInitialization(), 0, "initialize with defaults");
     expectStatus(
         client.step(0.0, 2.0), 0, "reset cleared time and stop constraint");
+    if (!client.windowModel()) {
+        expectStatus(client.step(2.0, 1.0), 0,
+            "variable step accepted by variable-step model");
+    }
     expectStatus(client.reset(), 0, "reset during stepping");
     expectStatus(client.reset(), 0, "reset while instantiated");
 
