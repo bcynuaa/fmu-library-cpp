@@ -49,6 +49,14 @@ class Model {
         return true;
     }
 
+    std::size_t valueReferenceCount() const noexcept {
+        return this->values_.size();
+    }
+
+    bool supportsVariableCommunicationStepSize() const noexcept {
+        return false;
+    }
+
     template <typename Reference>
     bool set(const Reference references[], std::size_t count,
         const double values[], bool initial_values_allowed) {

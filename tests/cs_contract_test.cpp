@@ -159,6 +159,15 @@ class Client {
     fmi2Component component() const { return this->instance_; }
     bool windowModel() const { return this->window_model_; }
 
+    Reference timeReference() const { return this->window_model_ ? 8 : 6; }
+
+    double time() {
+        const Reference reference = this->timeReference();
+        double value = -123.0;
+        expectStatus(this->get(&reference, 1, &value), 0, "get time");
+        return value;
+    }
+
     int set(
         const Reference* references, std::size_t count, const double* values) {
         if (this->version_ == 2)
@@ -402,6 +411,7 @@ void checkFMI3Contracts(Client& client) {
     expectStatus(client.step(0.0, 0.1), 3, "step before initialization");
     expectStatus(client.exitInitialization(), 3, "exit before initialization");
     expectStatus(client.terminate(), 3, "terminate before initialization");
+    expectNear(client.time(), 0.0, "initial time before initialization");
     seed(client);
     checkAccess(client);
     for (const double start : {nan, infinity, -infinity}) {
@@ -422,8 +432,10 @@ void checkFMI3Contracts(Client& client) {
     expectStatus(client.initialize(1.25), 3, "duplicate initialization");
     expectStatus(client.step(1.25, 0.1), 3, "step during initialization");
     expectStatus(client.terminate(), 3, "terminate during initialization");
+    expectNear(client.time(), 1.25, "time during initialization");
     checkAccess(client);
     expectStatus(client.exitInitialization(), 0, "finish initialization");
+    expectNear(client.time(), 1.25, "time after initialization");
     expectStatus(
         client.exitInitialization(), 3, "duplicate initialization exit");
     expectStatus(client.initialize(0.0), 3, "reenter initialization");
@@ -435,6 +447,36 @@ void checkFMI3Contracts(Client& client) {
         expectStatus(client.set(references, 2, replacements), 3,
             "late initial output write");
         require(client.values() == before, "late write changed inputs");
+    }
+
+    {
+        const Reference time_reference = client.timeReference();
+        const Reference mixed_references[] = {time_reference, 1};
+        double mixed_values[] = {-1.0, -1.0};
+        expectStatus(client.get(mixed_references, 2, mixed_values), 0,
+            "mixed time and model-variable read");
+        expectNear(mixed_values[0], 1.25, "mixed read time position");
+        expectNear(mixed_values[1], client.values()[0],
+            "mixed read model-variable position");
+
+        const Reference bad_mixed_references[] = {time_reference, 999};
+        double unchanged_values[] = {123.0, 456.0};
+        expectStatus(client.get(bad_mixed_references, 2, unchanged_values), 3,
+            "mixed read with invalid reference");
+        require(unchanged_values[0] == 123.0 && unchanged_values[1] == 456.0,
+            "failed mixed read changed caller buffer");
+
+        const auto before = client.values();
+        const double replacement[] = {2.0, 123.0};
+        expectStatus(client.set(mixed_references, 2, replacement), 3,
+            "mixed write with independent time");
+        require(client.values() == before,
+            "failed write containing time changed model variables");
+
+        const double replacement_time = 3.0;
+        expectStatus(client.set(&time_reference, 1, &replacement_time), 3,
+            "write independent time");
+        expectNear(client.time(), 1.25, "time unchanged after rejected write");
     }
 
     const auto before = client.values();
@@ -479,16 +521,34 @@ void checkFMI3Contracts(Client& client) {
     expectStatus(fmi3GetFloat32(instance, kInputs.data(), 1, &value, 1), 3,
         "unsupported scalar type");
     require(value == 123.0f, "unsupported getter changed buffer");
+    double communication_point = 1.25;
+    const std::array<double, 3> variable_step_sizes = {0.1, 0.05, 0.15};
     for (std::size_t index = 0; index < kStepInputs.size(); ++index) {
         expectStatus(client.set(kInputs.data(), 3, kStepInputs[index].data()),
             0, "set step inputs");
-        expectStatus(client.step(1.25 + 0.1 * index, 0.1), 0,
+        const double step_size =
+            client.windowModel() ? 0.1 : variable_step_sizes[index];
+        expectStatus(client.step(communication_point, step_size), 0,
             "valid step after rejected requests");
+        communication_point += step_size;
+        expectNear(
+            client.time(), communication_point, "time after successful step");
     }
-    expectStatus(client.step(1.55, 0.1), 3, "step beyond stop time");
+    if (client.windowModel()) {
+        const auto before = client.values();
+        expectStatus(client.step(communication_point, 0.2), 3,
+            "variable step rejected by fixed-step model");
+        require(client.values() == before,
+            "rejected variable step changed model values");
+        expectNear(client.time(), communication_point,
+            "time unchanged after rejected variable step");
+    }
+    expectStatus(
+        client.step(communication_point, 0.1), 3, "step beyond stop time");
     expectStatus(client.terminate(), 0, "terminate");
     expectStatus(client.terminate(), 3, "duplicate termination");
-    expectStatus(client.step(1.55, 0.1), 3, "step after termination");
+    expectStatus(
+        client.step(communication_point, 0.1), 3, "step after termination");
     expectStatus(client.initialize(0.0), 3, "initialize after termination");
     double output = 123.0;
     expectStatus(
@@ -508,6 +568,7 @@ void checkFMI3Contracts(Client& client) {
     seed(client);
     expectStatus(client.exitInitialization(), 0, "reinitialize");
     expectStatus(client.step(-2.0, 5.0), 0, "reset cleared stop constraint");
+    expectNear(client.time(), 3.0, "time after reset step");
     expectStatus(client.reset(), 0, "reset during stepping");
     expectStatus(client.reset(), 0, "reset while instantiated");
     const double huge = (std::numeric_limits<double>::max)();
